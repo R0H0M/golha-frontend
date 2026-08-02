@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-kook), sans-serif;
+  
+  --color-primary: #1C39BB;
+  --color-primary-hover: #152b8c;
+  --color-secondary: #00A594;
+  --color-secondary-hover: #008577;
+  
+  --color-accent-gold: #FFD700;
+  /* آپدیت رنگ قرمز اخرایی به کد جدید و شیک شما */
+  --color-accent-ochre: #e3725b; 
+  
+  --color-neutral-dark: #414042;
+  --color-neutral-light: #F4E1C1;
+  --color-neutral-bg: #FAF9F6;
+
+  --radius-bento: 1.25rem;
+}
+/* مابقی کدهای globals.css ... */
