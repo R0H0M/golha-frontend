@@ -2,8 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // ۱. این خط را برای صدور مجوز اتصال به آی‌پی خصوصی اضافه کنید
-    dangerouslyAllowSVG: true, // اگر لوگو svg دارید لازم است
+    // ۱. فلگ حیاتی Next.js 16 جهت اجازه دادن به لود از محدوده آی‌پی‌های محلی و خصوصی
+    dangerouslyAllowLocalIP: true, 
+    
+    // ۲. دور زدن بهینه‌ساز برای محیط لوکال
+    unoptimized: true, 
+    
     remotePatterns: [
       {
         protocol: "https",

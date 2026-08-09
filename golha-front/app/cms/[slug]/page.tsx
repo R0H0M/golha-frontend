@@ -29,8 +29,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8000/a
 // تابع دریافت اطلاعات تکی مقالات از API واقعی بک‌بند (/cms/articles/{slug}/)
 // ==========================================
 async function fetchArticleFromApi(slug: string): Promise<{ data: CmsPost | null; error: string | null; isBackendFault: boolean }> {
-  // آدرس‌دهی دقیق بر اساس متغیر محیطی شما بدون ایجاد تداخل تکرار api/v1
-  const url = `${API_BASE}/cms/articles/${slug}/`;
+  const encodedSlug = encodeURIComponent(slug);
+  const url = `${API_BASE}/cms/articles/${encodedSlug}/`;
 
   try {
     const res = await fetch(url, {
@@ -39,7 +39,7 @@ async function fetchArticleFromApi(slug: string): Promise<{ data: CmsPost | null
 
     if (!res.ok) {
       if (res.status === 404) {
-        return { data: null, error: null, isBackendFault: false }; // به معنی پیدا نشدن خبر در دیتابیس جهت هدایت به 404
+        return { data: null, error: null, isBackendFault: false };
       }
       if (res.status >= 500) {
         return {
@@ -57,11 +57,10 @@ async function fetchArticleFromApi(slug: string): Promise<{ data: CmsPost | null
 
     const data: CmsPost = await res.json();
 
-    // بررسی وجود فیلدهای پایه در پاسخ ارسالی بک‌بند جهت اطمینان از سلامت دیتابیس
     if (!data || !data.slug || !data.body) {
       return {
         data: null,
-        error: `[خطای فرمت ساختاری] دریافت اطلاعات خبر موفقیت‌آمیز بود اما فیلدهای ضروری (مانند slug یا body) در پاسخ بک‌بند وجود ندارند.`,
+        error: `[خطای فرمت ساختاری] فیلدهای ضروری (مانند slug یا body) در پاسخ بک‌بند وجود ندارند.`,
         isBackendFault: true
       };
     }
@@ -71,13 +70,32 @@ async function fetchArticleFromApi(slug: string): Promise<{ data: CmsPost | null
   } catch (err: unknown) {
     return {
       data: null,
-      error: `[خطای شبکه] امکان اتصال به سرور بک‌بند جهت لود مقاله وجود ندارد. لطفا مطمئن شوید وب‌سایت بک‌بند به درستی در آدرس ${API_BASE} در حال اجراست.`,
+      error: `[خطای شبکه] امکان اتصال به سرور بک‌بند جهت لود مقاله وجود ندارد.`,
       isBackendFault: false
     };
   }
 }
 
-// اکشن سرور برای ارسال دیدگاه‌ها به دیتابیس بک‌بند دپارتمان دهکده گل‌ها
+// ==========================================
+// تابع کمکی تبدیل آدرس نسبی به آدرس کامل و مطلق دیتابیس شما
+// ==========================================
+function getCorrectImageUrl(imagePath: string | undefined | null, fallbackUrl: string): string {
+  if (!imagePath) {
+    return fallbackUrl;
+  }
+
+  // اگر عکس قبلاً آدرس کامل بود
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+
+  // تصحیح آدرس نسبی (مانند /media/...) با استخراج دامنه اصلی از API_BASE
+  const domain = API_BASE.replace("/api/v1", ""); // استخراج http://10.73.183.121:8000
+  const correctedPath = imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
+  return `${domain}${correctedPath}`;
+}
+
+// اکشن سرور برای ارسال دیدگاه‌ها
 async function submitCommentAction(formData: FormData) {
   "use server";
   
@@ -97,12 +115,14 @@ export default async function SingleNewsPage(props: PageProps) {
   const { slug } = await props.params;
   const { data: article, error, isBackendFault } = await fetchArticleFromApi(slug);
 
-  // اگر اروری نبود اما دیتا هم خالی بود یعنی خبر واقعاً پیدا نشده است -> هدایت به صفحه ۴۰۴
   if (!error && !article) {
     notFound();
   }
 
-  // تخصیص پویای پالت رنگی به پچ دسته‌بندی
+  // ۱. تصحیح و تبدیل آدرس تصاویر به آدرس کامل و مطلق بک‌بند
+  const correctedMainImage = article ? getCorrectImageUrl(article.image, "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb") : "";
+  const correctedAuthorAvatar = article ? getCorrectImageUrl(article.authorAvatar, "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde") : "";
+
   const categoryBadgeColor = 
     article?.category === "توسعه" 
       ? "text-primary bg-primary/10" 
@@ -112,7 +132,7 @@ export default async function SingleNewsPage(props: PageProps) {
     <section className="w-full bg-[#f4f8fb] py-16 md:py-24">
       <div className="w-full px-4 lg:px-28 max-w-[1400px] mx-auto grid grid-cols-1 gap-12">
         
-        {/* پنل هوشمند بررسی و عیب‌یابی خطاها در صورت بروز اشکال در اتصال به سرور */}
+        {/* پنل هوشمند بررسی و عیب‌یابی خطاها */}
         {error ? (
           <div className="bg-white rounded-3xl p-8 border border-neutral-dark/10 shadow-sm text-right max-w-4xl mx-auto space-y-4">
             <div className="flex items-center gap-2 text-accent-ochre">
@@ -146,7 +166,8 @@ export default async function SingleNewsPage(props: PageProps) {
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-neutral-dark/50 font-bold pt-2 border-b border-neutral-dark/10 pb-6">
                   <div className="flex items-center gap-2">
                     <div className="relative w-6 h-6 rounded-full overflow-hidden bg-neutral-light/10">
-                      <Image src={article.authorAvatar} alt={article.author} fill={true} sizes="24px" className="object-cover" />
+                      {/* ۲. استفاده از تصویر تصحیح شده آواتار */}
+                      <Image src={correctedAuthorAvatar} alt={article.author} fill={true} sizes="24px" className="object-cover" />
                     </div>
                     <span className="text-neutral-dark font-extrabold">{article.author}</span>
                   </div>
@@ -157,10 +178,10 @@ export default async function SingleNewsPage(props: PageProps) {
                 </div>
               </div>
 
-              {/* عکس اصلی با اصلاح متغیر رسمی image دیتابیس شما */}
+              {/* عکس اصلی با استفاده از آدرس مطلق تصحیح شده */}
               <div className="relative w-full h-[300px] md:h-[500px] rounded-3xl overflow-hidden border border-neutral-dark/10 shadow-sm">
                 <Image
-                  src={article.image}
+                  src={correctedMainImage}
                   alt={article.title}
                   fill={true}
                   priority={true}
@@ -169,7 +190,7 @@ export default async function SingleNewsPage(props: PageProps) {
                 />
               </div>
 
-              {/* بدنه محتوایی لود شده مستقیم از فیلد body دیتابیس */}
+              {/* بدنه محتوایی */}
               <div className="max-w-4xl mx-auto w-full space-y-8 text-right">
                 <div 
                   className="prose prose-neutral max-w-none text-neutral-dark/85 font-semibold text-xs md:text-sm leading-relaxed text-justify"
@@ -219,7 +240,8 @@ export default async function SingleNewsPage(props: PageProps) {
                     </div>
 
                     <div className="relative h-56 rounded-3xl overflow-hidden border border-neutral-dark/10 group cursor-pointer shadow-sm">
-                      <Image src={article.image} alt="فیلم معرفی" fill={true} sizes="(max-width: 768px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-103" />
+                      {/* استفاده از تصویر اصلی تصحیح‌شده برای پلیر ویدیو */}
+                      <Image src={correctedMainImage} alt="فیلم معرفی" fill={true} sizes="(max-width: 768px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-103" />
                       <div className="absolute inset-0 bg-neutral-dark/20 flex items-center justify-center transition-colors group-hover:bg-neutral-dark/30 z-10">
                         <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-primary shadow-xl transition-transform duration-300 group-hover:scale-108 shrink-0">
                           <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5 mr-1">

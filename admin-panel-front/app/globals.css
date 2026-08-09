@@ -1,26 +1,28 @@
+/* app/globals.css */
 @import "tailwindcss";
 
+/* تعریف رنگ‌های سفارشی پروژه در Tailwind CSS v4 */
+@theme {
+  --color-primary: #1e3a8a;
+  --color-primary-hover: #1e40af;
+
+  --color-secondary: #059669;
+  --color-secondary-hover: #047857;
+
+  --color-neutral-dark: #1f2937;
+  --color-neutral-bg: #f3f4f6;
+
+  --color-accent-ochre: #d97706;
+}
+
+/* تنظیمات پایه برای جلوگیری از دارک‌مود خودکار و تثبیت راست‌چین */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+html, body {
+  direction: rtl;
+  text-align: right;
+  background-color: #f4f8fb;
+  color: #1f2937;
 }

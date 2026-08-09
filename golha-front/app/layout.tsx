@@ -40,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className={`${kookFont.variable}`}>
+    <html lang="fa" dir="rtl" className={`${kookFont.variable} scroll-pt-20`}>
       <body className="flex flex-col min-h-screen">
         {/* ۱. بنر هشدار در بالاترین بخش قرار می‌گیرد */}
         <AlertBanner />
