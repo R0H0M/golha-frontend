@@ -14,6 +14,7 @@ export interface EventItem {
   status: "ongoing" | "upcoming" | "past";
   is_published: boolean;
 }
+console.log("🌐 آدرس متغیر محیطی خوانده شده در Next.js:", process.env.NEXT_PUBLIC_API_URL);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8000/api/v1";
 

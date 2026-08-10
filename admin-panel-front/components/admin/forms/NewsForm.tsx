@@ -89,14 +89,26 @@ export default function NewsForm({
           </div>
         </div>
 
+        {/* فیلد انتخاب تصویر از روی کامپیوتر */}
         <div className="space-y-1.5">
-          <label className="text-xs font-extrabold text-neutral-dark/80">آدرس عکس هدر</label>
+          <label className="text-xs font-extrabold text-neutral-dark/80">تصویر اصلی خبر</label>
           <input
-            type="text"
-            value={newsForm.image || ""}
-            onChange={(e) => setNewsForm((prev) => ({ ...prev, image: e.target.value }))}
-            className="w-full bg-neutral-bg/30 border border-neutral-dark/15 rounded-xl px-4 py-3 text-xs md:text-sm font-semibold focus:outline-none text-left"
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              setNewsForm((prev) => ({ ...prev, image: file }));
+            }}
+            className="w-full bg-neutral-bg/30 border border-neutral-dark/15 rounded-xl px-4 py-2 text-xs focus:outline-none file:ml-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-primary file:text-white hover:file:bg-primary-hover cursor-pointer"
           />
+          {newsForm.image && (
+            <div className="mt-1 text-[11px] text-neutral-dark/60">
+              تصویر انتخاب شده:{" "}
+              <span className="font-bold">
+                {newsForm.image instanceof File ? newsForm.image.name : "تصویر در دیتابیس موجود است"}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-1.5">

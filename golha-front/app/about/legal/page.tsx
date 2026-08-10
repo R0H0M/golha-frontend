@@ -37,7 +37,7 @@ const LEGAL_DOCUMENTS: LegalDocument[] = [
 
 export default function LegalPage() {
   return (
-    <section className="w-full bg-[#f4f8fb] pt-20 pb-16 md:pt-16 md:pb-24">
+    <section className="w-full bg-[#f4f8fb] pt-10 pb-16 md:pt-8 md:pb-24">
       {/* پدینگ عریض هماهنگ با هدر ۶۴ پیکسلی بر روی px-28 */}
       <div className="w-full px-4 lg:px-28 space-y-16">
         

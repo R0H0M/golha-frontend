@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useSyncExternalStore } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8000/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8001/api/v1";
 
 // همگام‌سازی با تغییرات localStorage مرورگر
 const subscribe = (callback: () => void) => {

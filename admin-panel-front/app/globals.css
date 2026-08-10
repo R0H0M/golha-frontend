@@ -1,8 +1,9 @@
 /* app/globals.css */
 @import "tailwindcss";
 
-/* تعریف رنگ‌های سفارشی پروژه در Tailwind CSS v4 */
 @theme {
+  --font-sans: var(--font-kook), system-ui, sans-serif;
+
   --color-primary: #1e3a8a;
   --color-primary-hover: #1e40af;
 
@@ -15,7 +16,6 @@
   --color-accent-ochre: #d97706;
 }
 
-/* تنظیمات پایه برای جلوگیری از دارک‌مود خودکار و تثبیت راست‌چین */
 :root {
   color-scheme: light;
 }
@@ -25,4 +25,5 @@ html, body {
   text-align: right;
   background-color: #f4f8fb;
   color: #1f2937;
+  font-family: var(--font-kook), system-ui, sans-serif;
 }

@@ -16,7 +16,7 @@ import {
 import { CmsPost } from "@/types/cms";
 import { Announcement } from "@/types/announcement";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8000/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8001/api/v1";
 
 const initialNewsForm: NewsFormData = {
   title: "",
@@ -27,7 +27,7 @@ const initialNewsForm: NewsFormData = {
   author: "مدیر سیستم",
   author_avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde",
   reading_time: "۳ دقیقه مطالعه",
-  image: "",
+  image: null,
   is_featured: false,
   is_published: true,
 };
@@ -49,7 +49,7 @@ const initialEventForm: EventFormData = {
   body: "",
   date_display: "",
   location: "",
-  image: "",
+  image: null,
   is_published: true,
 };
 
@@ -154,66 +154,103 @@ export function useAdminCms(authToken: string, isLoggedIn: boolean) {
     setEditingId(null);
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatusMessage(null);
-    setLoading(true);
+  // ثبت و ویرایش فرم‌ها (پشتیبانی از FormData برای آپلود فایل)
+  // بخشی از فایل hooks/useAdminCms.ts
 
-    let endpoint = "";
-    let payload = {};
-    const method = activeView === "edit" ? "PUT" : "POST";
+const handleFormSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setStatusMessage(null);
+  setLoading(true);
 
-    if (activeTab === "news") {
-      endpoint =
-        activeView === "edit"
-          ? `${API_BASE}/cms/admin/articles/${editingId}/`
-          : `${API_BASE}/cms/admin/articles/`;
-      payload = newsForm;
-    } else if (activeTab === "announcements") {
-      endpoint =
-        activeView === "edit"
-          ? `${API_BASE}/cms/admin/announcements/${editingId}/`
-          : `${API_BASE}/cms/admin/announcements/`;
-      payload = announcementForm;
-    } else if (activeTab === "events") {
-      endpoint =
-        activeView === "edit"
-          ? `${API_BASE}/cms/admin/events/${editingId}/`
-          : `${API_BASE}/cms/admin/events/`;
-      payload = eventForm;
-    }
+  let endpoint = "";
+  // ✅ تغییر متد ویرایش از PUT به PATCH
+  const method = activeView === "edit" ? "PATCH" : "POST";
+  let bodyData: BodyInit;
+  let isMultipart = false;
 
-    try {
-      const res = await fetch(endpoint, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify(payload),
-      });
+  if (activeTab === "news") {
+    endpoint =
+      activeView === "edit"
+        ? `${API_BASE}/cms/admin/articles/${editingId}/`
+        : `${API_BASE}/cms/admin/articles/`;
 
-      if (res.ok) {
-        setStatusMessage({ text: "🎉 اطلاعات با موفقیت در دیتابیس ثبت شد.", success: true });
-        setActiveView("list");
-        resetForms();
-        fetchListData();
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        setStatusMessage({
-          text: `❌ خطا در ثبت (کد: ${res.status}). پیغام: ${JSON.stringify(errorData)}`,
-          success: false,
-        });
+    const formData = new FormData();
+    Object.entries(newsForm).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        if (key === "image") {
+          if (value instanceof File) {
+            formData.append("image", value);
+          }
+        } else {
+          formData.append(key, String(value));
+        }
       }
-    } catch (err) {
+    });
+    bodyData = formData;
+    isMultipart = true;
+  } else if (activeTab === "events") {
+    endpoint =
+      activeView === "edit"
+        ? `${API_BASE}/cms/admin/events/${editingId}/`
+        : `${API_BASE}/cms/admin/events/`;
+
+    const formData = new FormData();
+    Object.entries(eventForm).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        if (key === "image") {
+          if (value instanceof File) {
+            formData.append("image", value);
+          }
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+    bodyData = formData;
+    isMultipart = true;
+  } else {
+    endpoint =
+      activeView === "edit"
+        ? `${API_BASE}/cms/admin/announcements/${editingId}/`
+        : `${API_BASE}/cms/admin/announcements/`;
+    bodyData = JSON.stringify(announcementForm);
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${authToken}`,
+  };
+  if (!isMultipart) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: method, // ✅ اکنون در حالت ویرایش PATCH فرستاده می‌شود
+      headers: headers,
+      body: bodyData,
+    });
+
+    if (res.ok) {
+      setStatusMessage({ text: "🎉 اطلاعات با موفقیت در دیتابیس ثبت شد.", success: true });
+      setActiveView("list");
+      resetForms();
+      fetchListData();
+    } else {
+      const errorData = await res.json().catch(() => ({}));
       setStatusMessage({
-        text: "❌ خطای ارتباط شبکه. مطمئن شوید سرور بک‌بند فعال است.",
+        text: `❌ خطا در ثبت (کد: ${res.status}). پیغام: ${JSON.stringify(errorData)}`,
         success: false,
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (err) {
+    setStatusMessage({
+      text: "❌ خطای ارتباط شبکه. مطمئن شوید سرور بک‌بند فعال است.",
+      success: false,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDeleteItem = async (id: number) => {
     const confirmDelete = window.confirm("⚠️ آیا از حذف دائمی این ردیف اطلاعاتی از دیتابیس مطمئن هستید؟");
@@ -278,7 +315,7 @@ export function useAdminCms(authToken: string, isLoggedIn: boolean) {
         author: newsItem.author || "مدیر سیستم",
         author_avatar: newsItem.author_avatar || "",
         reading_time: newsItem.reading_time || "۳ دقیقه مطالعه",
-        image: newsItem.image || "",
+        image: newsItem.image || null,
         is_featured: !!newsItem.is_featured,
         is_published: !!newsItem.is_published,
       });
@@ -302,7 +339,7 @@ export function useAdminCms(authToken: string, isLoggedIn: boolean) {
         body: eventItem.body || "",
         date_display: eventItem.date_display || "",
         location: eventItem.location || "",
-        image: eventItem.image || "",
+        image: eventItem.image || null,
         is_published: !!eventItem.is_published,
       });
     }

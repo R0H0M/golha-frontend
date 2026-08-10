@@ -2,8 +2,9 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CommentForm from "@/components/comment-form";
 
-// تعریف اینترفیس منطبق بر فرمت ارسالی بک‌بند شما (CmsPost)
+// تعریف اینترفیس مقاله
 export interface CmsPost {
   id: number;
   title: string;
@@ -23,10 +24,22 @@ export interface CmsPost {
   updated_at: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8000/api/v1";
+// تعریف اینترفیس دیدگاه‌های دریافتی از API جدید
+export interface CommentItem {
+  id: number;
+  article: number;
+  name: string;
+  email: string;
+  website?: string;
+  comment: string;
+  is_approved: boolean;
+  created_at: string;
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://10.73.183.121:8001/api/v1";
 
 // ==========================================
-// تابع دریافت اطلاعات تکی مقالات از API واقعی بک‌بند (/cms/articles/{slug}/)
+// ۱. تابع دریافت اطلاعات تکی مقالات از API بک‌بند
 // ==========================================
 async function fetchArticleFromApi(slug: string): Promise<{ data: CmsPost | null; error: string | null; isBackendFault: boolean }> {
   const encodedSlug = encodeURIComponent(slug);
@@ -77,34 +90,42 @@ async function fetchArticleFromApi(slug: string): Promise<{ data: CmsPost | null
 }
 
 // ==========================================
-// تابع کمکی تبدیل آدرس نسبی به آدرس کامل و مطلق دیتابیس شما
+// ۲. تابع دریافت لیست دیدگاه‌های تایید شده یک مقاله از API جدید (/cms/articles/{slug}/comments/)
+// ==========================================
+async function fetchArticleCommentsFromApi(slug: string): Promise<CommentItem[]> {
+  const encodedSlug = encodeURIComponent(slug);
+  const url = `${API_BASE}/cms/articles/${encodedSlug}/comments/`;
+
+  try {
+    const res = await fetch(url, {
+      next: { revalidate: 10 }, // بازآفرینی سریع ۱۰ ثانیه‌ای جهت لود آنی دیدگاه‌های جدید تایید شده
+    });
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error(`[دیدگاه‌ها] خطا در دریافت دیدگاه‌های مقاله ${slug}:`, err);
+    return [];
+  }
+}
+
+// ==========================================
+// تابع کمکی تبدیل آدرس نسبی به آدرس کامل و مطلق دیتابیس
 // ==========================================
 function getCorrectImageUrl(imagePath: string | undefined | null, fallbackUrl: string): string {
   if (!imagePath) {
     return fallbackUrl;
   }
 
-  // اگر عکس قبلاً آدرس کامل بود
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return imagePath;
   }
 
-  // تصحیح آدرس نسبی (مانند /media/...) با استخراج دامنه اصلی از API_BASE
-  const domain = API_BASE.replace("/api/v1", ""); // استخراج http://10.73.183.121:8000
+  const domain = API_BASE.replace("/api/v1", ""); // استخراج http://10.73.183.121:8001
   const correctedPath = imagePath.startsWith("/") ? imagePath : `/${imagePath}`;
   return `${domain}${correctedPath}`;
-}
-
-// اکشن سرور برای ارسال دیدگاه‌ها
-async function submitCommentAction(formData: FormData) {
-  "use server";
-  
-  const name = formData.get("name");
-  const email = formData.get("email");
-  const website = formData.get("website");
-  const comment = formData.get("comment");
-
-  console.log("ارسال دیدگاه به بک‌بند با فرمت دیتابیس:", { name, email, website, comment });
 }
 
 type PageProps = {
@@ -113,13 +134,19 @@ type PageProps = {
 
 export default async function SingleNewsPage(props: PageProps) {
   const { slug } = await props.params;
-  const { data: article, error, isBackendFault } = await fetchArticleFromApi(slug);
+  
+  // واکشی موازی و همزمان اطلاعات مقاله و لیست دیدگاه‌های تاییدشده از بک‌بند
+  const [articleResult, comments] = await Promise.all([
+    fetchArticleFromApi(slug),
+    fetchArticleCommentsFromApi(slug)
+  ]);
+
+  const { data: article, error, isBackendFault } = articleResult;
 
   if (!error && !article) {
     notFound();
   }
 
-  // ۱. تصحیح و تبدیل آدرس تصاویر به آدرس کامل و مطلق بک‌بند
   const correctedMainImage = article ? getCorrectImageUrl(article.image, "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb") : "";
   const correctedAuthorAvatar = article ? getCorrectImageUrl(article.authorAvatar, "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde") : "";
 
@@ -132,7 +159,7 @@ export default async function SingleNewsPage(props: PageProps) {
     <section className="w-full bg-[#f4f8fb] py-16 md:py-24">
       <div className="w-full px-4 lg:px-28 max-w-[1400px] mx-auto grid grid-cols-1 gap-12">
         
-        {/* پنل هوشمند بررسی و عیب‌یابی خطاها */}
+        {/* پنل هوشمند عیب‌یابی خطاها */}
         {error ? (
           <div className="bg-white rounded-3xl p-8 border border-neutral-dark/10 shadow-sm text-right max-w-4xl mx-auto space-y-4">
             <div className="flex items-center gap-2 text-accent-ochre">
@@ -159,15 +186,14 @@ export default async function SingleNewsPage(props: PageProps) {
                 <span className={`inline-flex items-center text-xs font-extrabold px-3.5 py-1 rounded-full ${categoryBadgeColor}`}>
                   {article.category}
                 </span>
-                <h1 className="text-2xl md:text-4xl font-black text-neutral-dark leading-tight tracking-tight">
+                <h1 className="text-2xl md:text-4xl lg:text-5xl font-black text-neutral-dark leading-tight tracking-tight">
                   {article.title}
                 </h1>
                 
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-neutral-dark/50 font-bold pt-2 border-b border-neutral-dark/10 pb-6">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs md:text-sm text-neutral-dark/50 font-bold pt-2 border-b border-neutral-dark/10 pb-6">
                   <div className="flex items-center gap-2">
-                    <div className="relative w-6 h-6 rounded-full overflow-hidden bg-neutral-light/10">
-                      {/* ۲. استفاده از تصویر تصحیح شده آواتار */}
-                      <Image src={correctedAuthorAvatar} alt={article.author} fill={true} sizes="24px" className="object-cover" />
+                    <div className="relative w-7 h-7 rounded-full overflow-hidden bg-neutral-light/10">
+                      <Image src={correctedAuthorAvatar} alt={article.author} fill={true} sizes="28px" className="object-cover" unoptimized={true} />
                     </div>
                     <span className="text-neutral-dark font-extrabold">{article.author}</span>
                   </div>
@@ -178,8 +204,8 @@ export default async function SingleNewsPage(props: PageProps) {
                 </div>
               </div>
 
-              {/* عکس اصلی با استفاده از آدرس مطلق تصحیح شده */}
-              <div className="relative w-full h-[300px] md:h-[500px] rounded-3xl overflow-hidden border border-neutral-dark/10 shadow-sm">
+              {/* عکس اصلی مقاله */}
+              <div className="relative w-full h-[300px] md:h-[520px] rounded-3xl overflow-hidden border border-neutral-dark/10 shadow-sm">
                 <Image
                   src={correctedMainImage}
                   alt={article.title}
@@ -187,77 +213,22 @@ export default async function SingleNewsPage(props: PageProps) {
                   priority={true}
                   sizes="100vw"
                   className="object-cover"
+                  unoptimized={true}
                 />
               </div>
 
-              {/* بدنه محتوایی */}
+              {/* بدنه اصلی متن مقاله */}
               <div className="max-w-4xl mx-auto w-full space-y-8 text-right">
                 <div 
-                  className="prose prose-neutral max-w-none text-neutral-dark/85 font-semibold text-xs md:text-sm leading-relaxed text-justify"
+                  className="prose prose-neutral max-w-none text-neutral-dark/90 font-semibold text-base md:text-lg lg:text-xl leading-relaxed md:leading-loose text-justify space-y-6"
                   dangerouslySetInnerHTML={{ __html: article.body }} 
                 />
 
-                {/* نقل قول */}
-                <blockquote className="border-r-4 border-secondary bg-secondary/5 rounded-2xl p-6 md:p-8 my-10 flex gap-4 items-start text-right">
-                  <span className="text-secondary text-4xl leading-none select-none font-serif">“</span>
-                  <p className="text-xs md:text-base font-extrabold text-secondary leading-relaxed">
-                    لورم ایپسوم متن ساختگی با تولید سادگی نامفهوم از صنعت چاپ و با استفاده از طراحان گرافیک است.
-                  </p>
-                </blockquote>
-
-                {/* ویژگی‌ها */}
-                <div className="space-y-6 pt-4">
-                  <h2 className="text-lg md:text-xl font-black text-neutral-dark tracking-tight">
-                    بهینه‌سازی سیستم‌های آبرسانی و سرعت انتقال آب
-                  </h2>
-                  <p className="text-xs md:text-sm text-neutral-dark/75 leading-relaxed font-semibold text-justify">
-                    {article.excerpt}
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center py-6">
-                    <div className="space-y-4">
-                      <h3 className="text-sm md:text-base font-extrabold text-neutral-dark mb-4">معرفی برخی از ویژگی‌ها</h3>
-                      <ul className="space-y-3">
-                        <li className="flex items-center gap-3 text-xs md:text-sm font-extrabold text-neutral-dark/80">
-                          <svg className="w-5 h-5 text-secondary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          بیمه اموال تجاری زون‌ها
-                        </li>
-                        <li className="flex items-center gap-3 text-xs md:text-sm font-extrabold text-neutral-dark/80">
-                          <svg className="w-5 h-5 text-secondary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          تم مناسب و هماهنگ با بودجه
-                        </li>
-                        <li className="flex items-center gap-3 text-xs md:text-sm font-extrabold text-neutral-dark/80">
-                          <svg className="w-5 h-5 text-secondary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                          رضایت حداکثری مالکین
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div className="relative h-56 rounded-3xl overflow-hidden border border-neutral-dark/10 group cursor-pointer shadow-sm">
-                      {/* استفاده از تصویر اصلی تصحیح‌شده برای پلیر ویدیو */}
-                      <Image src={correctedMainImage} alt="فیلم معرفی" fill={true} sizes="(max-width: 768px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-103" />
-                      <div className="absolute inset-0 bg-neutral-dark/20 flex items-center justify-center transition-colors group-hover:bg-neutral-dark/30 z-10">
-                        <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-primary shadow-xl transition-transform duration-300 group-hover:scale-108 shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-5 h-5 mr-1">
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* تگ‌ها */}
-                <div className="border-t border-b border-neutral-dark/10 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-bold text-neutral-dark/50">
+                {/* برچسب‌ها و دکمه‌های اشتراک‌گذاری */}
+                <div className="border-t border-b border-neutral-dark/10 py-6 my-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs md:text-sm font-bold text-neutral-dark/50">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-neutral-dark">برچسب‌ها:</span>
-                    <Link href={`/cms?search=${article.category}`} className="bg-white hover:bg-neutral-light/10 text-neutral-dark/70 border border-neutral-dark/10 px-3 py-1.5 rounded-lg transition-colors">
+                    <Link href={`/cms?search=${article.category}`} className="bg-white hover:bg-neutral-light/10 text-neutral-dark/70 border border-neutral-dark/10 px-3.5 py-1.5 rounded-lg transition-colors">
                       {article.category}
                     </Link>
                   </div>
@@ -273,71 +244,50 @@ export default async function SingleNewsPage(props: PageProps) {
                   </div>
                 </div>
 
-                {/* فرم تعاملی ارسال دیدگاه */}
-                <div className="bg-white rounded-3xl p-6 md:p-8 border border-neutral-dark/10 shadow-sm mt-12 text-right space-y-6">
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-neutral-dark border-r-4 border-primary pr-3 leading-none">ارسال دیدگاه</h3>
-                    <p className="text-[11px] md:text-xs font-semibold text-neutral-dark/45 mt-3">
-                      نشانی ایمیل شما منتشر نخواهد شد. بخش‌های موردنیاز علامت‌گذاری شده‌اند *
-                    </p>
+                {/* ========================================================================= */}
+                {/* بخش جدید: لیست دیدگاه‌های تاییدشده کاربران (لود زنده از API) */}
+                {/* ========================================================================= */}
+                <div className="bg-white rounded-3xl p-6 md:p-8 border border-neutral-dark/10 shadow-sm space-y-6 text-right">
+                  <div className="flex items-center justify-between border-b border-neutral-dark/10 pb-4">
+                    <h3 className="text-lg md:text-xl font-black text-neutral-dark border-r-4 border-primary pr-3 leading-none">
+                      دیدگاه‌های کاربران
+                    </h3>
+                    <span className="text-xs font-bold text-neutral-dark/50 bg-neutral-bg px-3 py-1 rounded-full">
+                      {comments.length} دیدگاه ثبت‌شده
+                    </span>
                   </div>
 
-                  <form action={submitCommentAction} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-extrabold text-neutral-dark/80">نام *</label>
-                        <input 
-                          type="text" 
-                          name="name" 
-                          required 
-                          placeholder="نام خود را وارد کنید"
-                          className="w-full bg-neutral-bg/30 border border-neutral-dark/15 rounded-xl px-4 py-3 text-xs md:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-extrabold text-neutral-dark/80">ایمیل *</label>
-                        <input 
-                          type="email" 
-                          name="email" 
-                          required 
-                          placeholder="آدرس ایمیل خود را وارد کنید"
-                          className="w-full bg-neutral-bg/30 border border-neutral-dark/15 rounded-xl px-4 py-3 text-xs md:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                        />
-                      </div>
+                  {comments.length === 0 ? (
+                    <p className="text-xs md:text-sm font-semibold text-neutral-dark/50 text-center py-6">
+                      هنوز دیدگاهی برای این مقاله منتشر نشده است. اولین نفری باشید که نظر خود را ثبت می‌کنید!
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {comments.map((item) => (
+                        <div key={item.id} className="bg-neutral-bg/40 p-5 rounded-2xl border border-neutral-dark/5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              {/* آواتار متنی مینی‌مال با حرف اول نام فرستنده */}
+                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs shrink-0 select-none">
+                                {item.name ? item.name.charAt(0) : "؟"}
+                              </div>
+                              <span className="text-xs md:text-sm font-black text-neutral-dark">{item.name}</span>
+                            </div>
+                            <span className="text-[10px] md:text-xs text-neutral-dark/40 font-bold">
+                              {item.created_at ? new Date(item.created_at).toLocaleDateString("fa-IR") : ""}
+                            </span>
+                          </div>
+                          <p className="text-xs md:text-sm font-semibold text-neutral-dark/80 leading-relaxed pr-10">
+                            {item.comment}
+                          </p>
+                        </div>
+                      ))}
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-extrabold text-neutral-dark/80">آدرس وب‌سایت (اختیاری)</label>
-                      <input 
-                        type="url" 
-                        name="website" 
-                        placeholder="https://example.com"
-                        className="w-full bg-neutral-bg/30 border border-neutral-dark/15 rounded-xl px-4 py-3 text-xs md:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all text-left"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-extrabold text-neutral-dark/80">دیدگاه شما *</label>
-                      <textarea 
-                        name="comment" 
-                        required 
-                        rows={5}
-                        placeholder="دیدگاه خود را اینجا وارد کنید..."
-                        className="w-full bg-neutral-bg/30 border border-neutral-dark/15 rounded-xl px-4 py-3 text-xs md:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all min-h-[120px]"
-                      />
-                    </div>
-
-                    <button 
-                      type="submit"
-                      className="bg-primary hover:bg-primary-hover text-white text-xs md:text-sm font-bold py-3.5 px-8 rounded-xl transition-all cursor-pointer flex items-center gap-2 self-start shadow-sm"
-                    >
-                      ارسال دیدگاه
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                      </svg>
-                    </button>
-                  </form>
+                  )}
                 </div>
+
+                {/* فرم تعاملی ارسال دیدگاه جدید */}
+                <CommentForm slug={slug} />
 
               </div>
             </>

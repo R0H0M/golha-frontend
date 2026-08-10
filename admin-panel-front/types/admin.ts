@@ -40,7 +40,7 @@ export interface NewsFormData {
   author: string;
   author_avatar: string;
   reading_time: string;
-  image?: string;
+  image?: File | string | null; // ✅ پذیرش فایل و متن
   is_featured: boolean;
   is_published: boolean;
 }
@@ -62,7 +62,7 @@ export interface EventFormData {
   body: string;
   date_display: string;
   location: string;
-  image: string;
+  image?: File | string | null; // ✅ پذیرش فایل و متن
   is_published: boolean;
 }
 

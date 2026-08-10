@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // تزریق مستقیم و تضمینی متغیر محیطی در Next.js
+  env: {
+    NEXT_PUBLIC_API_URL: "http://10.73.183.121:8001/api/v1",
+  },
   images: {
-    // ۱. فلگ حیاتی Next.js 16 جهت اجازه دادن به لود از محدوده آی‌پی‌های محلی و خصوصی
-    dangerouslyAllowLocalIP: true, 
-    
-    // ۲. دور زدن بهینه‌ساز برای محیط لوکال
-    unoptimized: true, 
-    
+    dangerouslyAllowLocalIP: true,
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: "https",
@@ -15,8 +15,8 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "http",
-        hostname: "10.73.183.121",
-        port: "8000",
+        hostname: "http://10.73.183.121",
+        port: "8001",
       },
     ],
   },
