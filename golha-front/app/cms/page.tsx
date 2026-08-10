@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { MOCK_ARTICLES } from "@/lib/mock-data";
 
 export interface CmsPost {
   id: number;
@@ -33,63 +34,38 @@ async function fetchNewsFromApi(search?: string, category?: string): Promise<{ d
   if (category) params.append("category", category);
   if (search) params.append("search", search);
 
-  const queryString = params.toString();
-  if (queryString) {
-    endpoint += `?${queryString}`;
+  if (params.toString()) {
+    endpoint += `?${params.toString()}`;
   }
 
   try {
-    const res = await fetch(endpoint, {
-      next: { revalidate: 60 },
-    });
+    const res = await fetch(endpoint, { next: { revalidate: 60 } });
 
-    if (!res.ok) {
-      return {
-        data: null,
-        error: `[خطای بک‌بند] پاسخ ناموفق بود (کد وضعیت: ${res.status}).`,
-        isBackendFault: true
-      };
+    if (res.ok) {
+      const data: CmsPost[] = await res.json();
+      if (Array.isArray(data)) {
+        return { data: filterHelper(data, search, category), error: null, isBackendFault: false };
+      }
     }
-
-    const data: CmsPost[] = await res.json();
-
-    if (!Array.isArray(data)) {
-      return {
-        data: null,
-        error: `[خطای ساختار داده] خروجی بک‌بند آرایه (Array) نیست.`,
-        isBackendFault: true
-      };
-    }
-
-    // فیلتر پایه: اخبار منتشر شده
-    let filtered = data.filter((item: CmsPost) => item.is_published);
-
-    // ۲. فیلتر پشتیبان (Fallback) جهت تضمین کارکرد فیلتر حتی اگر بک‌بند کوئری‌ها را نادیده بگیرد
-    if (category && category.trim()) {
-      filtered = filtered.filter((item: CmsPost) => 
-        item.category ? item.category.trim() === category.trim() : false
-      );
-    }
-
-    if (search && search.trim()) {
-      const query = search.trim().toLowerCase();
-      filtered = filtered.filter((item: CmsPost) =>
-        (item.title && item.title.toLowerCase().includes(query)) ||
-        (item.excerpt && item.excerpt.toLowerCase().includes(query))
-      );
-    }
-
-    return { data: filtered, error: null, isBackendFault: false };
-
-  } catch (err: unknown) {
-    return {
-      data: null,
-      error: `[خطای ارتباط شبکه] امکان اتصال به سرور بک‌بند در آدرس ${API_BASE} وجود ندارد.`,
-      isBackendFault: false
-    };
+  } catch (err) {
+    // در صورت خاموش بودن بک‌بند، بدون ارور به صورت هوشمند روی دیتای ماک سوئیچ می‌کند
+    console.warn("⚠️ [حالت دمو] اتصال به بک‌بند برقرار نشد. دیتای ماک لوکال لود شد.");
   }
+
+  // سوئیچ خودکار به دیتای آفلاین ماک
+  return { data: filterHelper(MOCK_ARTICLES, search, category), error: null, isBackendFault: false };
 }
 
+// تابع کمکی فیلتر هوشمند
+function filterHelper(list: CmsPost[], search?: string, category?: string) {
+  let filtered = list.filter(item => item.is_published);
+  if (category?.trim()) filtered = filtered.filter(item => item.category?.trim() === category.trim());
+  if (search?.trim()) {
+    const q = search.trim().toLowerCase();
+    filtered = filtered.filter(item => item.title.toLowerCase().includes(q) || item.excerpt.toLowerCase().includes(q));
+  }
+  return filtered;
+}
 function getCorrectImageUrl(imagePath: string | undefined | null): string {
   if (!imagePath) {
     return "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&q=80&w=800";
