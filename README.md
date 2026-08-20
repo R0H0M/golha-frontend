@@ -42,6 +42,7 @@
 
 پروژه به صورت ماژولار و مبتنی بر دامنه (Domain-Based) سازمان‌دهی شده است:
 
+```text
 src/
 ├── app/                              # پوشه اصلی Next.js (App Router)
 │   ├── layout.tsx                    # لی‌اوت سراسری (شامل هدر، فوتر و آلرت بنر)
@@ -78,6 +79,7 @@ src/
 └── types/                            # تایپ‌های اختصاصی TypeScript
     ├── cms.ts                        # اینترفیس CmsPost
     └── announcement.ts               # اینترفیس Announcement
+```
 
 🚀 ویژگی‌ها و صفحات اصلی پورتال
 
